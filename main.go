@@ -1,5 +1,3 @@
-// eggっち完全版（餌5回で成長、死亡時にログとボタン表示＋世代カウント＋重複世代バグ修正＋墓地リセット機能）
-
 package main
 
 import (
@@ -8,12 +6,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"sync"
 )
 
-const graveyardFile = "graves.json"
-
-// Pet: 現在のeggっち
 type Pet struct {
 	Name       string
 	FeedCount  int
@@ -23,7 +19,6 @@ type Pet struct {
 	mu         sync.Mutex
 }
 
-// Grave: 死んだ個体の履歴
 type Grave struct {
 	Name       string `json:"name"`
 	Stage      int    `json:"stage"`
@@ -38,18 +33,15 @@ var egg = &Pet{
 	Generation: 1,
 }
 
-var stageNames = []string{"🥚 たまご", "👶 赤ちゃん", "🧒 子供", "👴 高齢者"}
-
-var foods = map[string]string{
-	"ramen":   "ラーメン",
-	"cake":    "ケーキ",
-	"natto":   "納豆",
-	"onigiri": "おにぎり",
-}
-
+var stageNames = []string{"🥚 たまご", "👶 赤ちゃん", "🧒 子供", "🧑 大人", "👴 高齢者"}
+var foods = map[string]string{"ramen": "ラーメン", "cake": "ケーキ", "natto": "納豆", "onigiri": "おにぎり"}
 var foodOrder = []string{"ramen", "cake", "natto", "onigiri"}
+const graveyardFile = "graves.json"
 
 func main() {
+	// サーバ起動時に古い墓地を削除
+	_ = os.Remove(graveyardFile)
+
 	http.HandleFunc("/", statusHandler)
 	http.HandleFunc("/name", nameHandler)
 	http.HandleFunc("/feed/", feedHandler)
@@ -58,8 +50,7 @@ func main() {
 	http.HandleFunc("/reset_graveyard", resetGraveyardHandler)
 
 	log.Println("起動 → http://localhost:8080")
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
+	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("サーバー起動失敗: %v", err)
 	}
 }
@@ -77,7 +68,7 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 <p>最終ステージ: %s</p>
 <p>食べた回数: %d</p>
 <form action="/next" method="POST">
-	<input type="submit" value="次の卵を生む">
+    <input type="submit" value="次の卵を生む">
 </form>
 <a href="/graveyard">過去のeggっちたち</a>
 </body></html>`, egg.Name, egg.Generation, stageNames[egg.Stage], egg.FeedCount)
@@ -121,12 +112,10 @@ func nameHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	egg.mu.Lock()
-	defer egg.mu.Unlock()
-	if egg.Generation == 0 {
-		egg.Generation = 1
-	}
 	egg.Name = name
 	egg.Status = stageNames[egg.Stage]
+	egg.mu.Unlock()
+
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -149,8 +138,6 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			egg.Status = "dead"
 			saveToGraveyard(egg.Name, egg.Stage, egg.FeedCount, egg.Generation)
-			http.Redirect(w, r, "/", http.StatusSeeOther)
-			return
 		}
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -162,17 +149,21 @@ func nextHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	egg.mu.Lock()
-	prevGen := egg.Generation
-	if prevGen < 1 {
-		prevGen = 1
+	if egg.Name != "" {
+		saveToGraveyard(egg.Name, egg.Stage, egg.FeedCount, egg.Generation)
 	}
-	*egg = Pet{Status: "egg", Stage: 0, FeedCount: 0, Generation: prevGen + 1}
+	egg.Generation++
+	egg.Name = ""
+	egg.Stage = 0
+	egg.Status = "egg"
+	egg.FeedCount = 0
 	egg.mu.Unlock()
+
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func saveToGraveyard(name string, stage int, feedCount int, generation int) {
-	graves := []Grave{}
+	var graves []Grave
 	_ = loadJSON(&graves)
 	graves = append(graves, Grave{Name: name, Stage: stage, FeedCount: feedCount, Generation: generation})
 	data, _ := json.MarshalIndent(graves, "", "  ")
@@ -180,12 +171,16 @@ func saveToGraveyard(name string, stage int, feedCount int, generation int) {
 }
 
 func graveyardHandler(w http.ResponseWriter, r *http.Request) {
-	graves := []Grave{}
+	var graves []Grave
 	_ = loadJSON(&graves)
+
+	sort.Slice(graves, func(i, j int) bool {
+		return graves[i].Generation < graves[j].Generation
+	})
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintln(w, `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>墓地</title></head><body>`)
-	fmt.Fprintln(w, `<h2>過去のeggっちたち</h2><ul>`)
+	fmt.Fprintln(w, `<h2>過去のeggっちたち</h2><ul>`) 
 	for _, g := range graves {
 		fmt.Fprintf(w, `<li>第%d世代 %s（%s） 食べた回数: %d</li>
 `, g.Generation, g.Name, stageNames[g.Stage], g.FeedCount)
@@ -193,7 +188,8 @@ func graveyardHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, `</ul><form action="/reset_graveyard" method="POST" onsubmit="return confirm('本当に墓地データを消去しますか？');">
 <input type="submit" value="墓地をリセット">
 </form>
-<a href="/">戻る</a></body></html>`)
+<a href="/">戻る</a>
+</body></html>`)
 }
 
 func resetGraveyardHandler(w http.ResponseWriter, r *http.Request) {
@@ -205,10 +201,10 @@ func resetGraveyardHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/graveyard", http.StatusSeeOther)
 }
 
-func loadJSON(target any) error {
+func loadJSON(target interface{}) error {
 	data, err := os.ReadFile(graveyardFile)
 	if err != nil {
-		return nil // エラー無視（初回起動など）
+		return nil
 	}
 	return json.Unmarshal(data, target)
 }
