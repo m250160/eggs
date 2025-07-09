@@ -1,0 +1,15 @@
+# Go
+/bin/
+/pkg/
+*.exe
+*.log
+*.out
+*.test
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
