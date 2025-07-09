@@ -56,6 +56,8 @@ func main() {
 	http.HandleFunc("/next", nextHandler)
 	http.HandleFunc("/graveyard", graveyardHandler)
 	http.HandleFunc("/reset_graveyard", resetGraveyardHandler)
+	// 画像ファイルを静的に配信
+	http.HandleFunc("/images/", imageHandler)
 
 	log.Println("起動 → http://localhost:8080")
 	err := http.ListenAndServe(":8080", nil)
@@ -73,6 +75,7 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 
 	if egg.Status == "dead" {
 		fmt.Fprintf(w, `<h2>%s は天に召されました🙏</h2>
+<img src="/images/dead.png" alt="死んだeggっち" style="width:200px;height:200px;">
 <p>世代: 第%d世代</p>
 <p>最終ステージ: %s</p>
 <p>食べた回数: %d</p>
@@ -86,6 +89,7 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 
 	if egg.Name == "" {
 		fmt.Fprintf(w, `<h2>第%d世代の新しい命が誕生！名前をつけてね</h2>
+<img src="/images/egg.png" alt="たまご" style="width:200px;height:200px;">
 <form action="/name" method="POST">
 <input type="text" name="name" required>
 <input type="submit" value="決定">
@@ -94,10 +98,26 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 現在のステージに応じた画像を表示
+	var imageName string
+	switch egg.Stage {
+	case 0:
+		imageName = "egg.png"
+	case 1:
+		imageName = "baby.png"
+	case 2:
+		imageName = "child.png"
+	case 3:
+		imageName = "elderly.png"
+	default:
+		imageName = "egg.png"
+	}
+
 	fmt.Fprintf(w, `<h2>第%d世代 %s：%s</h2>
+<img src="/images/%s" alt="%s" style="width:200px;height:200px;">
 <p>食べた回数: %d / 5</p>
 <h3>🍽️ 餌をあげる</h3>
-`, egg.Generation, egg.Name, stageNames[egg.Stage], egg.FeedCount%5)
+`, egg.Generation, egg.Name, stageNames[egg.Stage], imageName, stageNames[egg.Stage], egg.FeedCount%5)
 
 	for _, key := range foodOrder {
 		fmt.Fprintf(w, `<form action="/feed/%s" method="POST" style="display:inline;">
@@ -211,4 +231,8 @@ func loadJSON(target any) error {
 		return nil // エラー無視（初回起動など）
 	}
 	return json.Unmarshal(data, target)
+}
+
+func imageHandler(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "."+r.URL.Path)
 }
