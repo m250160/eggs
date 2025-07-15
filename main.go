@@ -169,9 +169,6 @@ func nextHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	egg.mu.Lock()
-	if egg.Name != "" {
-		saveToGraveyard(egg.Name, egg.Stage, egg.FeedCount, egg.Generation)
-	}
 	egg.Generation++
 	egg.Name = ""
 	egg.Stage = 0

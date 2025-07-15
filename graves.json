@@ -1,14 +1,14 @@
 [
   {
-    "name": "あ",
+    "name": "a",
     "stage": 4,
     "feed_count": 25,
     "generation": 1
   },
   {
-    "name": "あ",
+    "name": "w",
     "stage": 4,
     "feed_count": 25,
-    "generation": 1
+    "generation": 2
   }
 ]
