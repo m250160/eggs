@@ -76,8 +76,8 @@ func main() {
 	// 画像ファイルを静的に配信
 	http.HandleFunc("/images/", imageHandler)
 
-	log.Println("起動 → http://localhost:8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	log.Println("起動 → http://localhost:18090")
+	if err := http.ListenAndServe(":18090", nil); err != nil {
 		log.Fatalf("サーバー起動失敗: %v", err)
 	}
 }
@@ -122,15 +122,35 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 	var imageName string
 	switch egg.Stage {
 	case 0:
-		imageName = "egg.png"
+		if egg.IsSick == 0 {
+			imageName = "egg.png"
+		} else {
+			imageName = "egg_sick.png"
+		}
 	case 1:
-		imageName = "baby.png"
+		if egg.IsSick == 0 {
+			imageName = "baby.png"
+		} else {
+			imageName = "baby_sick.png"
+		}
 	case 2:
-		imageName = "child.png"
+		if egg.IsSick == 0 {
+			imageName = "child.png"
+		} else {
+			imageName = "child_sick.png"
+		}
 	case 3:
-		imageName = "adult.png"
+		if egg.IsSick == 0 {
+			imageName = "adult.png"
+		} else {
+			imageName = "adult_sick.png"
+		}
 	case 4:
-		imageName = "elderly.png"
+		if egg.IsSick == 0 {
+			imageName = "elderly.png"
+		} else {
+			imageName = "elderly_sick.png"
+		}
 	default:
 		imageName = "egg.png"
 	}
