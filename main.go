@@ -45,7 +45,7 @@ var egg = &Pet{
 	Stage:         0,
 	FeedCount:     0,
 	Generation:    1,
-	Money:         15,
+	Money:         0,
 	MinigamePlays: 0,
 }
 
