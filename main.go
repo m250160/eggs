@@ -19,6 +19,7 @@ type Pet struct {
 	Status     string
 	Generation int
 	IsSick     int
+	Money      int
 	mu         sync.Mutex
 }
 
@@ -34,6 +35,7 @@ var egg = &Pet{
 	Stage:      0,
 	FeedCount:  0,
 	Generation: 1,
+	Money:      15,
 }
 
 var stageNames = []string{"🥚 たまご", "👶 赤ちゃん", "🧒 子供", "🧑 大人", "👴 高齢者"}
@@ -51,6 +53,13 @@ var foodGrowth = map[string]int{
 	"salad": 2,
 	"onigiri": 3,
 	"liver": 5,
+}
+var foodPrices = map[string]int{
+	"ramen":  12,
+	"cake":   20,
+	"salad":  8,
+	"onigiri": 5,
+	"liver":  1,
 }
 const graveyardFile = "graves.json"
 
@@ -79,6 +88,7 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 	if egg.IsSick > 0 {
 		fmt.Fprintf(w, `<p style="color:red;">🤒 病気レベル %d：このまま成長すると死亡します！</p>`, egg.IsSick)
 	}
+	fmt.Fprintf(w, `<p>所持金: %d ぐっち</p>`, egg.Money)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintln(w, `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>eggっち</title></head><body>`)
@@ -175,6 +185,18 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 	// ---- 病気判定ロジック（食べ物による確率）----
 	food := r.URL.Path[len("/feed/"):]
 	rand.Seed(time.Now().UnixNano())
+
+	price, ok := foodPrices[food]
+	if !ok {
+		price = 10 // デフォルト価格
+	}
+
+	if egg.Money < foodPrices[food] {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, `<script>alert("所持金が足りません！"); window.location.href = "/";</script>`)
+		return
+	}
+	egg.Money -= price
 
 	var sickChance float64
 
