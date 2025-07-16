@@ -142,10 +142,11 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 `, egg.Generation, egg.Name, stageNames[egg.Stage], imageName, stageNames[egg.Stage], egg.FeedCount%5)
 
 	for _, key := range foodOrder {
-		fmt.Fprintf(w, `<form action="/feed/%s" method="POST" style="display:inline;">
-<input type="submit" value="%s">
-</form>
-`, key, foods[key])
+		price := foodPrices[key]
+		fmt.Fprintf(w, `<form action="/feed/%s" method="POST" style="display:inline; margin: 5px;">
+	<input type="submit" value="%s（%dぐっち）">
+	</form>
+	`, key, foods[key], price)
 	}
 
 	fmt.Fprintln(w, `<p><a href="/graveyard">過去のeggっちたちを見る</a></p>
