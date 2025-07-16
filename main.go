@@ -4,14 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"sort"
 	"sync"
-	"math/rand"
 	"time"
 )
 
+// initはプログラム開始時に一度だけ呼ばれる
+func init() {
+	// 乱数のシード（種）を設定
+	rand.Seed(time.Now().UnixNano())
+}
+
+// Pet 構造体：ペットの状態を管理
 type Pet struct {
 	Name       string
 	FeedCount  int
@@ -23,6 +30,7 @@ type Pet struct {
 	mu         sync.Mutex
 }
 
+// Grave 構造体：死んだペットの記録
 type Grave struct {
 	Name       string `json:"name"`
 	Stage      int    `json:"stage"`
@@ -30,6 +38,7 @@ type Grave struct {
 	Generation int    `json:"generation"`
 }
 
+// グローバル変数としてペットの状態を管理
 var egg = &Pet{
 	Status:     "egg",
 	Stage:      0,
@@ -38,141 +47,141 @@ var egg = &Pet{
 	Money:      15,
 }
 
+// 各種設定値
 var stageNames = []string{"🥚 たまご", "👶 赤ちゃん", "🧒 子供", "🧑 大人", "👴 高齢者"}
 var foods = map[string]string{
-	"ramen": "ラーメン",
-	"cake": "ケーキ",
-	"salad": "サラダ",
+	"ramen":   "ラーメン",
+	"cake":    "ケーキ",
+	"salad":   "サラダ",
 	"onigiri": "おにぎり",
 	"liver":   "レバ刺し",
 }
 var foodOrder = []string{"ramen", "cake", "salad", "onigiri", "liver"}
 var foodGrowth = map[string]int{
-	"ramen": 3,
-	"cake": 4,
-	"salad": 2,
+	"ramen":   3,
+	"cake":    4,
+	"salad":   2,
 	"onigiri": 3,
-	"liver": 5,
+	"liver":   5,
 }
 var foodPrices = map[string]int{
-	"ramen":  12,
-	"cake":   20,
-	"salad":  8,
+	"ramen":   12,
+	"cake":    20,
+	"salad":   8,
 	"onigiri": 5,
-	"liver":  1,
+	"liver":   1,
 }
+
 const graveyardFile = "graves.json"
 
+// main関数：プログラムのエントリーポイント
 func main() {
-	// サーバ起動時に古い墓地を削除
+	// サーバー起動時に古い墓地ファイルを削除
 	_ = os.Remove(graveyardFile)
 
+	// URLと処理関数を紐付ける（ルーティング）
 	http.HandleFunc("/", statusHandler)
 	http.HandleFunc("/name", nameHandler)
 	http.HandleFunc("/feed/", feedHandler)
 	http.HandleFunc("/next", nextHandler)
 	http.HandleFunc("/graveyard", graveyardHandler)
 	http.HandleFunc("/reset_graveyard", resetGraveyardHandler)
-	// 画像ファイルを静的に配信
 	http.HandleFunc("/images/", imageHandler)
+	http.HandleFunc("/minigame", minigameHandler) // ★ミニゲーム用のハンドラを追加
 
-	log.Println("起動 → http://localhost:18090")
-	if err := http.ListenAndServe(":18090", nil); err != nil {
+	// ログのポート番号を修正
+	log.Println("起動 → http://localhost:8080")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("サーバー起動失敗: %v", err)
 	}
 }
 
+// statusHandler：メイン画面を表示
 func statusHandler(w http.ResponseWriter, r *http.Request) {
 	egg.mu.Lock()
 	defer egg.mu.Unlock()
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintln(w, `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>eggっち</title></head><body>`)
+
 	if egg.IsSick > 0 {
 		fmt.Fprintf(w, `<p style="color:red;">🤒 病気レベル %d：このまま成長すると死亡します！</p>`, egg.IsSick)
 	}
 	fmt.Fprintf(w, `<p>所持金: %d ぐっち</p>`, egg.Money)
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintln(w, `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>eggっち</title></head><body>`)
-
 	if egg.Status == "dead" {
 		fmt.Fprintf(w, `<h2>%s は天に召されました🙏</h2>
 <img src="/images/dead.png" alt="死んだeggっち" style="width:200px;height:200px;">
-<p>世代: 第%d世代</p>
-<p>最終ステージ: %s</p>
-<p>食べた回数: %d</p>
-<form action="/next" method="POST">
-    <input type="submit" value="次の卵を生む">
-</form>
-<a href="/graveyard">過去のeggっちたち</a>
-</body></html>`, egg.Name, egg.Generation, stageNames[egg.Stage], egg.FeedCount)
+<p>世代: 第%d世代</p><p>最終ステージ: %s</p><p>食べた回数: %d</p>
+<form action="/next" method="POST"><input type="submit" value="次の卵を生む"></form>
+<a href="/graveyard">過去のeggっちたち</a>`, egg.Name, egg.Generation, stageNames[egg.Stage], egg.FeedCount)
 		return
 	}
 
 	if egg.Name == "" {
 		fmt.Fprintf(w, `<h2>第%d世代の新しい命が誕生！名前をつけてね</h2>
 <img src="/images/egg.png" alt="たまご" style="width:200px;height:200px;">
-<form action="/name" method="POST">
-<input type="text" name="name" required>
-<input type="submit" value="決定">
-</form>
-</body></html>`, egg.Generation)
+<form action="/name" method="POST"><input type="text" name="name" required><input type="submit" value="決定"></form>`, egg.Generation)
 		return
 	}
 
-	// 現在のステージに応じた画像を表示
-	var imageName string
+	// ★画像表示ロジックを簡潔化
+	var baseImageName string
 	switch egg.Stage {
-	case 0:
-		if egg.IsSick == 0 {
-			imageName = "egg.png"
-		} else {
-			imageName = "egg_sick.png"
-		}
 	case 1:
-		if egg.IsSick == 0 {
-			imageName = "baby.png"
-		} else {
-			imageName = "baby_sick.png"
-		}
+		baseImageName = "baby"
 	case 2:
-		if egg.IsSick == 0 {
-			imageName = "child.png"
-		} else {
-			imageName = "child_sick.png"
-		}
+		baseImageName = "child"
 	case 3:
-		if egg.IsSick == 0 {
-			imageName = "adult.png"
-		} else {
-			imageName = "adult_sick.png"
-		}
+		baseImageName = "adult"
 	case 4:
-		if egg.IsSick == 0 {
-			imageName = "elderly.png"
-		} else {
-			imageName = "elderly_sick.png"
-		}
+		baseImageName = "elderly"
 	default:
-		imageName = "egg.png"
+		baseImageName = "egg"
+	}
+
+	imageName := baseImageName + ".png"
+	if egg.IsSick > 0 {
+		imageName = baseImageName + "_sick.png"
 	}
 
 	fmt.Fprintf(w, `<h2>第%d世代 %s：%s</h2>
 <img src="/images/%s" alt="%s" style="width:200px;height:200px;">
 <p>食べた回数: %d / 5</p>
-<h3>🍽️ 餌をあげる</h3>
-`, egg.Generation, egg.Name, stageNames[egg.Stage], imageName, stageNames[egg.Stage], egg.FeedCount%5)
+<h3>🍽️ 餌をあげる</h3>`, egg.Generation, egg.Name, stageNames[egg.Stage], imageName, stageNames[egg.Stage], egg.FeedCount%5)
 
 	for _, key := range foodOrder {
 		price := foodPrices[key]
-		fmt.Fprintf(w, `<form action="/feed/%s" method="POST" style="display:inline; margin: 5px;">
-	<input type="submit" value="%s（%dぐっち）">
-	</form>
-	`, key, foods[key], price)
+		fmt.Fprintf(w, `<form action="/feed/%s" method="POST" style="display:inline; margin:5px;"><input type="submit" value="%s（%dぐっち）"></form>`, key, foods[key], price)
 	}
 
-	fmt.Fprintln(w, `<p><a href="/graveyard">過去のeggっちたちを見る</a></p>
-</body></html>`)
+	// ★ミニゲームへのリンクを追加
+	fmt.Fprintln(w, `<hr><h3>🎲 ミニゲーム</h3><p><a href="/minigame">サイコロを振ってお金を稼ぐ</a></p>`)
+
+	fmt.Fprintln(w, `<p><a href="/graveyard">過去のeggっちたちを見る</a></p></body></html>`)
 }
 
+// minigameHandler：ミニゲームを実行して結果を表示
+func minigameHandler(w http.ResponseWriter, r *http.Request) {
+	egg.mu.Lock()
+	dice1, dice2, reward := RollDice()
+	egg.Money += reward
+	egg.mu.Unlock()
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintln(w, `<!DOCTYPE html><html><head><title>ミニゲーム結果</title></head><body>`)
+	fmt.Fprintf(w, "<h2>🎲 結果は... %d と %d！</h2>", dice1, dice2)
+	if dice1 == dice2 {
+		fmt.Fprintf(w, `<p style="color:red; font-weight:bold;">ゾロ目ボーナス！</p>`)
+	}
+	fmt.Fprintf(w, "<p><strong>%d ぐっち</strong> を手に入れた！</p>", reward)
+	fmt.Fprintln(w, `<p><a href="/minigame">もう一度挑戦！</a></p>`)
+	fmt.Fprintln(w, `<p><a href="/">ゲームに戻る</a></p>`)
+	fmt.Fprintln(w, `</body></html>`)
+}
+
+
+// nameHandler：ペットに名前をつける
 func nameHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -187,10 +196,10 @@ func nameHandler(w http.ResponseWriter, r *http.Request) {
 	egg.Name = name
 	egg.Status = stageNames[egg.Stage]
 	egg.mu.Unlock()
-
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+// feedHandler：餌をあげてペットを成長させる
 func feedHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -198,21 +207,22 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	egg.mu.Lock()
 	defer egg.mu.Unlock()
+
 	if egg.Status == "dead" || egg.Name == "" {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
-	// ---- 病気判定ロジック（食べ物による確率）----
 	food := r.URL.Path[len("/feed/"):]
-	rand.Seed(time.Now().UnixNano())
+	
+	// ★不要なrand.Seed呼び出しを削除
 
 	price, ok := foodPrices[food]
 	if !ok {
-		price = 10 // デフォルト価格
+		price = 10
 	}
 
-	if egg.Money < foodPrices[food] {
+	if egg.Money < price {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		fmt.Fprint(w, `<script>alert("所持金が足りません！"); window.location.href = "/";</script>`)
 		return
@@ -220,7 +230,6 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 	egg.Money -= price
 
 	var sickChance float64
-
 	switch food {
 	case "ramen":
 		sickChance = 0.15
@@ -239,15 +248,13 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 			egg.IsSick++
 		}
 	}
-	
-	// --- 成長ポイントの加算処理（新） ---
+
 	growth, ok := foodGrowth[food]
 	if !ok {
-		growth = 1 // デフォルト1
+		growth = 1
 	}
 	egg.FeedCount += growth
 
-	// --- ステージ成長処理（1回で複数進む可能性あり） ---
 	for egg.FeedCount >= 5 {
 		if egg.IsSick > 0 {
 			egg.Status = "dead"
@@ -266,6 +273,7 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+// nextHandler：次の世代のペットを準備
 func nextHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -279,10 +287,10 @@ func nextHandler(w http.ResponseWriter, r *http.Request) {
 	egg.FeedCount = 0
 	egg.IsSick = 0
 	egg.mu.Unlock()
-
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+// saveToGraveyard：死んだペットをJSONファイルに保存
 func saveToGraveyard(name string, stage int, feedCount int, generation int) {
 	var graves []Grave
 	_ = loadJSON(&graves)
@@ -291,6 +299,7 @@ func saveToGraveyard(name string, stage int, feedCount int, generation int) {
 	_ = os.WriteFile(graveyardFile, data, 0644)
 }
 
+// graveyardHandler：墓地の一覧を表示
 func graveyardHandler(w http.ResponseWriter, r *http.Request) {
 	var graves []Grave
 	_ = loadJSON(&graves)
@@ -301,18 +310,16 @@ func graveyardHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintln(w, `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>墓地</title></head><body>`)
-	fmt.Fprintln(w, `<h2>過去のeggっちたち</h2><ul>`) 
+	fmt.Fprintln(w, `<h2>過去のeggっちたち</h2><ul>`)
 	for _, g := range graves {
-		fmt.Fprintf(w, `<li>第%d世代 %s（%s） 食べた回数: %d</li>
-`, g.Generation, g.Name, stageNames[g.Stage], g.FeedCount)
+		fmt.Fprintf(w, `<li>第%d世代 %s（%s） 食べた回数: %d</li>`, g.Generation, g.Name, stageNames[g.Stage], g.FeedCount)
 	}
 	fmt.Fprintln(w, `</ul><form action="/reset_graveyard" method="POST" onsubmit="return confirm('本当に墓地データを消去しますか？');">
-<input type="submit" value="墓地をリセット">
-</form>
-<a href="/">戻る</a>
-</body></html>`)
+<input type="submit" value="墓地をリセット"></form>
+<a href="/">戻る</a></body></html>`)
 }
 
+// resetGraveyardHandler：墓地データをリセット
 func resetGraveyardHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/graveyard", http.StatusSeeOther)
@@ -322,14 +329,16 @@ func resetGraveyardHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/graveyard", http.StatusSeeOther)
 }
 
+// loadJSON：JSONファイルからデータを読み込む
 func loadJSON(target interface{}) error {
 	data, err := os.ReadFile(graveyardFile)
 	if err != nil {
-		return nil
+		return nil // ファイルがなくてもエラーにしない
 	}
 	return json.Unmarshal(data, target)
 }
 
+// imageHandler：画像ファイルを配信
 func imageHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "."+r.URL.Path)
 }
