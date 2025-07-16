@@ -7,7 +7,7 @@ import (
 
 // サイコロを2個投げて合計値を返す関数
 // ゾロ目の場合は合計値の2倍を返す
-func rollDice() int {
+func rollDice() (int, int, int) {
     // 乱数の種を設定
     rand.Seed(time.Now().UnixNano())
     
@@ -22,7 +22,7 @@ func rollDice() int {
         return sum * 2
     }
     
-    return sum
+    return dice1, dice2, sum
 }
 
 // 仮に構造体を用いている
