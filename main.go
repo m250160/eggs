@@ -99,6 +99,8 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 	case 2:
 		imageName = "child.png"
 	case 3:
+		imageName = "adult.png"
+	case 4:
 		imageName = "elderly.png"
 	default:
 		imageName = "egg.png"

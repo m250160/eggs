@@ -1,14 +1,8 @@
 [
   {
-    "name": "a",
+    "name": "eguchi",
     "stage": 4,
     "feed_count": 25,
     "generation": 1
-  },
-  {
-    "name": "w",
-    "stage": 4,
-    "feed_count": 25,
-    "generation": 2
   }
 ]
