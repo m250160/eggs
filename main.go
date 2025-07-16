@@ -8,6 +8,8 @@ import (
 	"os"
 	"sort"
 	"sync"
+	"math/rand"
+	"time"
 )
 
 type Pet struct {
@@ -16,6 +18,7 @@ type Pet struct {
 	Stage      int
 	Status     string
 	Generation int
+	IsSick     int
 	mu         sync.Mutex
 }
 
@@ -34,8 +37,21 @@ var egg = &Pet{
 }
 
 var stageNames = []string{"🥚 たまご", "👶 赤ちゃん", "🧒 子供", "🧑 大人", "👴 高齢者"}
-var foods = map[string]string{"ramen": "ラーメン", "cake": "ケーキ", "natto": "納豆", "onigiri": "おにぎり"}
-var foodOrder = []string{"ramen", "cake", "natto", "onigiri"}
+var foods = map[string]string{
+	"ramen": "ラーメン",
+	"cake": "ケーキ",
+	"salad": "サラダ",
+	"onigiri": "おにぎり",
+	"liver":   "レバ刺し",
+}
+var foodOrder = []string{"ramen", "cake", "salad", "onigiri", "liver"}
+var foodGrowth = map[string]int{
+	"ramen": 3,
+	"cake": 4,
+	"salad": 2,
+	"onigiri": 3,
+	"liver": 5,
+}
 const graveyardFile = "graves.json"
 
 func main() {
@@ -60,6 +76,9 @@ func main() {
 func statusHandler(w http.ResponseWriter, r *http.Request) {
 	egg.mu.Lock()
 	defer egg.mu.Unlock()
+	if egg.IsSick > 0 {
+		fmt.Fprintf(w, `<p style="color:red;">🤒 病気レベル %d：このまま成長すると死亡します！</p>`, egg.IsSick)
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintln(w, `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>eggっち</title></head><body>`)
@@ -152,14 +171,53 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	egg.FeedCount++
-	if egg.FeedCount%5 == 0 {
-		if egg.Stage < len(stageNames)-1 {
+
+	// ---- 病気判定ロジック（食べ物による確率）----
+	food := r.URL.Path[len("/feed/"):]
+	rand.Seed(time.Now().UnixNano())
+
+	var sickChance float64
+
+	switch food {
+	case "ramen":
+		sickChance = 0.15
+	case "cake":
+		sickChance = 0.1
+	case "salad":
+		sickChance = 0.2
+	case "onigiri":
+		sickChance = 0.3
+	case "liver":
+		sickChance = 0.9
+	}
+
+	if rand.Float64() < sickChance {
+		if egg.IsSick < 3 {
+			egg.IsSick++
+		}
+	}
+	
+	// --- 成長ポイントの加算処理（新） ---
+	growth, ok := foodGrowth[food]
+	if !ok {
+		growth = 1 // デフォルト1
+	}
+	egg.FeedCount += growth
+
+	// --- ステージ成長処理（1回で複数進む可能性あり） ---
+	for egg.FeedCount >= 5 {
+		if egg.IsSick > 0 {
+			egg.Status = "dead"
+			saveToGraveyard(egg.Name, egg.Stage, egg.FeedCount, egg.Generation)
+			break
+		} else if egg.Stage < len(stageNames)-1 {
 			egg.Stage++
 			egg.Status = stageNames[egg.Stage]
+			egg.FeedCount -= 5
 		} else {
 			egg.Status = "dead"
 			saveToGraveyard(egg.Name, egg.Stage, egg.FeedCount, egg.Generation)
+			break
 		}
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -176,6 +234,7 @@ func nextHandler(w http.ResponseWriter, r *http.Request) {
 	egg.Stage = 0
 	egg.Status = "egg"
 	egg.FeedCount = 0
+	egg.IsSick = 0
 	egg.mu.Unlock()
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
