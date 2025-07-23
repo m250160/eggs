@@ -28,6 +28,7 @@ type Pet struct {
 	IsSick        int
 	Money         int
 	MinigamePlays int
+	FoodHistory map[string]int
 	IsMinigame    bool // ミニゲームをプレイ中かどうか
 	mu            sync.Mutex
 }
@@ -48,6 +49,7 @@ var egg = &Pet{
 	Money:         0,
 	MinigamePlays: 0,
 	IsMinigame: false,
+	FoodHistory:   make(map[string]int),
 }
 
 // 各種設定値
@@ -154,7 +156,24 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 	switch egg.Stage {
 	case 1: baseImageName = "baby"
 	case 2: baseImageName = "child"
-	case 3: baseImageName = "adult"
+	case 3: // adult
+		maxFood := ""
+		maxCount := 0
+		for food, count := range egg.FoodHistory {
+			if count > maxCount {
+				maxCount = count
+				maxFood = food
+			}
+		}
+
+		switch maxFood {
+		case "ramen":
+			baseImageName = "fat_adult"
+		case "liver":
+			baseImageName = "muscle_adult"
+		default:
+			baseImageName = "adult"
+		}
 	case 4: baseImageName = "elderly"
 	default: baseImageName = "egg"
 	}
@@ -261,13 +280,15 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	egg.Money -= price
 
+	egg.FoodHistory[food]++
+
 	var sickChance float64
 	switch food {
 	case "ramen": sickChance = 0.15
 	case "cake": sickChance = 0.1
 	case "salad": sickChance = 0.2
 	case "onigiri": sickChance = 0.3
-	case "liver": sickChance = 0.9
+	case "liver": sickChance = 0.7
 	}
 
 	if rand.Float64() < sickChance {
@@ -288,14 +309,36 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 	for egg.FeedCount >= 5 {
 		if egg.Stage < len(stageNames)-1 {
 			egg.Stage++
-			egg.Status = stageNames[egg.Stage]
 			egg.FeedCount = 0
 			egg.MinigamePlays = 0
+
+			// 分岐進化条件（大人になるときのみ）
+			if egg.Stage == 3 {
+				maxFood := ""
+				maxCount := 0
+				for food, count := range egg.FoodHistory {
+					if count > maxCount {
+						maxCount = count
+						maxFood = food
+					}
+				}
+				switch maxFood {
+				case "ramen":
+					egg.Status = "fat_adult"
+				case "liver":
+					egg.Status = "muscle_adult"
+				default:
+					egg.Status = stageNames[egg.Stage] // 通常大人
+				}
+			} else {
+				egg.Status = stageNames[egg.Stage]
+			}
 		} else {
 			egg.Status = "dead"
 			saveToGraveyard(egg.Name, egg.Stage, egg.Generation)
 			break
 		}
+
 	}
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -315,6 +358,7 @@ func nextHandler(w http.ResponseWriter, r *http.Request) {
 	egg.FeedCount = 0
 	egg.IsSick = 0
 	egg.MinigamePlays = 0
+	egg.FoodHistory = make(map[string]int)
 	egg.mu.Unlock()
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -367,7 +411,24 @@ func healHandler(w http.ResponseWriter, r *http.Request) {
 	switch egg.Stage {
 	case 1: baseImageName = "baby"
 	case 2: baseImageName = "child"
-	case 3: baseImageName = "adult"
+	case 3: // adult
+		maxFood := ""
+		maxCount := 0
+		for food, count := range egg.FoodHistory {
+			if count > maxCount {
+				maxCount = count
+				maxFood = food
+			}
+		}
+
+		switch maxFood {
+		case "ramen":
+			baseImageName = "fat_adult"
+		case "liver":
+			baseImageName = "muscle_adult"
+		default:
+			baseImageName = "adult"
+		}
 	case 4: baseImageName = "elderly"
 	default: baseImageName = "egg"
 	}
