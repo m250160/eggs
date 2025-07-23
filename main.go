@@ -245,7 +245,7 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 		} else if egg.Stage < len(stageNames)-1 {
 			egg.Stage++
 			egg.Status = stageNames[egg.Stage]
-			egg.FeedCount -= 5
+			egg.FeedCount = 0
 			egg.MinigamePlays = 0
 		} else {
 			egg.Status = "dead"
