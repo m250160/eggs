@@ -91,8 +91,8 @@ func main() {
 	http.HandleFunc("/minigame", minigameHandler)
 	http.HandleFunc("/heal", healHandler)
 	http.HandleFunc("/self_destruct", selfDestructHandler)
-	log.Println("起動 → http://localhost:8090")
-	if err := http.ListenAndServe(":8090", nil); err != nil {
+	log.Println("起動 → http://localhost:18090")
+	if err := http.ListenAndServe(":18090", nil); err != nil {
 		log.Fatalf("サーバー起動失敗: %v", err)
 	}
 }
@@ -362,9 +362,33 @@ func healHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 治療前の病気画像を取得
+	var baseImageName string
+	switch egg.Stage {
+	case 1: baseImageName = "baby"
+	case 2: baseImageName = "child"
+	case 3: baseImageName = "adult"
+	case 4: baseImageName = "elderly"
+	default: baseImageName = "egg"
+	}
+	treatmentImageName := baseImageName + "_treatment.png"
+	
 	egg.Money -= cost
 	egg.IsSick = 0
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+
+	// 治療完了ポップアップを表示
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintln(w, `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>治療完了</title></head><body>`)
+	fmt.Fprintln(w, `<audio id="bgm" loop autoplay volume="0.5"><source src="/Audio/BGM/chiptune_sounds.mp3" type="audio/mpeg">お使いのブラウザはaudio要素をサポートしていません。</audio>`)
+	fmt.Fprintln(w, `<h2>🏥 治療中・・・</h2>`)
+	fmt.Fprintf(w, `<img src="/images/%s" alt="治療前" style="width:200px;height:200px;">`, treatmentImageName)
+	fmt.Fprintln(w, `<p>病気を治療しています・・・</p>`)
+	fmt.Fprintln(w, `<script>
+		setTimeout(function() {
+			window.location.href = "/";
+		}, 2000);
+	</script>`)
+	fmt.Fprintln(w, `</body></html>`)
 }
 
 
