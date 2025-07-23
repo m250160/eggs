@@ -1,20 +1,7 @@
 [
   {
     "name": "ｗ３",
-    "stage": 0,
-    "feed_count": 9,
+    "stage": 1,
     "generation": 1
-  },
-  {
-    "name": "えぐち",
-    "stage": 0,
-    "feed_count": 8,
-    "generation": 2
-  },
-  {
-    "name": "i",
-    "stage": 0,
-    "feed_count": 8,
-    "generation": 3
   }
 ]

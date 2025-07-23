@@ -35,7 +35,6 @@ type Pet struct {
 type Grave struct {
 	Name       string `json:"name"`
 	Stage      int    `json:"stage"`
-	FeedCount  int    `json:"feed_count"`
 	Generation int    `json:"generation"`
 }
 
@@ -110,7 +109,7 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, `<p>所持金: %d ぐっち</p>`, egg.Money)
 
 	if egg.Status == "dead" {
-		fmt.Fprintf(w, `<h2>%s は天に召されました🙏</h2><img src="/images/dead.png" alt="死んだeggっち" style="width:200px;height:200px;"><p>世代: 第%d世代</p><p>最終ステージ: %s</p><p>食べた回数: %d</p><form action="/next" method="POST"><input type="submit" value="次の卵を生む"></form><a href="/graveyard">過去のeggっちたち</a>`, egg.Name, egg.Generation, stageNames[egg.Stage], egg.FeedCount)
+		fmt.Fprintf(w, `<h2>%s は天に召されました🙏</h2><img src="/images/dead.png" alt="死んだeggっち" style="width:200px;height:200px;"><p>世代: 第%d世代</p><p>最終ステージ: %s</p><form action="/next" method="POST"><input type="submit" value="次の卵を生む"></form><a href="/graveyard">過去のeggっちたち</a>`, egg.Name, egg.Generation, stageNames[egg.Stage])
 		return
 	}
 
@@ -132,7 +131,7 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 		imageName = baseImageName + "_sick.png"
 	}
 
-	fmt.Fprintf(w, `<h2>第%d世代 %s：%s</h2><img src="/images/%s" alt="%s" style="width:200px;height:200px;"><p>食べた回数: %d / 5</p><h3>🍽️ 餌をあげる</h3>`, egg.Generation, egg.Name, stageNames[egg.Stage], imageName, stageNames[egg.Stage], egg.FeedCount%5)
+	fmt.Fprintf(w, `<h2>第%d世代 %s：%s</h2><img src="/images/%s" alt="%s" style="width:200px;height:200px;"><p>満腹度: %d / 5</p><h3>🍽️ 餌をあげる</h3>`, egg.Generation, egg.Name, stageNames[egg.Stage], imageName, stageNames[egg.Stage], egg.FeedCount%5)
 
 	for _, key := range foodOrder {
 		price := foodPrices[key]
@@ -240,7 +239,7 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 	for egg.FeedCount >= 5 {
 		if egg.IsSick > 0 {
 			egg.Status = "dead"
-			saveToGraveyard(egg.Name, egg.Stage, egg.FeedCount, egg.Generation)
+			saveToGraveyard(egg.Name, egg.Stage, egg.Generation)
 			break
 		} else if egg.Stage < len(stageNames)-1 {
 			egg.Stage++
@@ -249,7 +248,7 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 			egg.MinigamePlays = 0
 		} else {
 			egg.Status = "dead"
-			saveToGraveyard(egg.Name, egg.Stage, egg.FeedCount, egg.Generation)
+			saveToGraveyard(egg.Name, egg.Stage, egg.Generation)
 			break
 		}
 	}
@@ -275,10 +274,10 @@ func nextHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // saveToGraveyard：死んだペットをJSONファイルに保存
-func saveToGraveyard(name string, stage int, feedCount int, generation int) {
+func saveToGraveyard(name string, stage int, generation int) {
 	var graves []Grave
 	_ = loadJSON(&graves)
-	graves = append(graves, Grave{Name: name, Stage: stage, FeedCount: feedCount, Generation: generation})
+	graves = append(graves, Grave{Name: name, Stage: stage, Generation: generation})
 	data, _ := json.MarshalIndent(graves, "", "  ")
 	_ = os.WriteFile(graveyardFile, data, 0644)
 }
@@ -291,7 +290,7 @@ func graveyardHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintln(w, `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>墓地</title></head><body><h2>過去のeggっちたち</h2><ul>`)
 	for _, g := range graves {
-		fmt.Fprintf(w, `<li>第%d世代 %s（%s） 食べた回数: %d</li>`, g.Generation, g.Name, stageNames[g.Stage], g.FeedCount)
+		fmt.Fprintf(w, `<li>第%d世代 %s（%s）</li>`, g.Generation, g.Name, stageNames[g.Stage])
 	}
 	fmt.Fprintln(w, `</ul><form action="/reset_graveyard" method="POST" onsubmit="return confirm('本当に墓地データを消去しますか？');"><input type="submit" value="墓地をリセット"></form><a href="/">戻る</a></body></html>`)
 }
