@@ -406,9 +406,44 @@ func healHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 治療前の病気画像を取得
+	var baseImageName string
+	switch egg.Stage {
+	case 1: baseImageName = "baby"
+	case 2: baseImageName = "child"
+	case 3: baseImageName = "adult"
+	case 4: baseImageName = "elderly"
+	default: baseImageName = "egg"
+	}
+	treatmentImageName := baseImageName + "_treatment.png"
+	treatedImageName := baseImageName + "_treatmented.png" // 治療完了後は健康な画像
+	
 	egg.Money -= cost
 	egg.IsSick = 0
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+
+	// 治療完了ポップアップを表示
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintln(w, `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>治療完了</title></head><body>`)
+	fmt.Fprintln(w, `<audio id="bgm" loop autoplay volume="0.5"><source src="/Audio/BGM/chiptune_sounds.mp3" type="audio/mpeg">お使いのブラウザはaudio要素をサポートしていません。</audio>`)
+	fmt.Fprintln(w, `<h2 id="title">🏥 治療中・・・</h2>`)
+	fmt.Fprintf(w, `<img id="treatmentImage" src="/images/%s" alt="治療中" style="width:200px;height:200px;">`, treatmentImageName)
+	fmt.Fprintln(w, `<p id="message">病気を治療しています・・・</p>`)
+	fmt.Fprintf(w, `<p>治療費: %dぐっち</p>`, cost)
+	fmt.Fprintln(w, `<script>
+		// 2秒後に治療完了に切り替え
+		setTimeout(function() {
+			document.getElementById('title').innerHTML = '✨ 治療完了！';
+			document.getElementById('treatmentImage').src = '/images/` + treatedImageName + `';
+			document.getElementById('treatmentImage').alt = '治療完了';
+			document.getElementById('message').innerHTML = '病気が完全に治りました！';
+		}, 2000);
+		
+		// さらに2秒後にメイン画面に戻る
+		setTimeout(function() {
+			window.location.href = "/";
+		}, 4000);
+	</script>`)
+	fmt.Fprintln(w, `</body></html>`)
 }
 
 
