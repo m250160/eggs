@@ -46,7 +46,7 @@ var egg = &Pet{
 	Stage:         0,
 	FeedCount:     0,
 	Generation:    1,
-	Money:         1000,
+	Money:         0,
 	MinigamePlays: 0,
 	IsMinigame: false,
 	FoodHistory:   make(map[string]int),
@@ -157,19 +157,23 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 	case 1: baseImageName = "baby"
 	case 2: baseImageName = "child"
 	case 3: // adult
-	maxFood := ""
-	maxCount := 0
-	for food, count := range egg.FoodHistory {
-		if count > maxCount {
-			maxCount = count
-			maxFood = food
+		maxFood := ""
+		maxCount := 0
+		for food, count := range egg.FoodHistory {
+			if count > maxCount {
+				maxCount = count
+				maxFood = food
+			}
 		}
-	}
-	if maxFood == "ramen" {
-		baseImageName = "fat_adult" 
-	} else {
-		baseImageName = "adult"
-	}
+
+		switch maxFood {
+		case "ramen":
+			baseImageName = "fat_adult"
+		case "liver":
+			baseImageName = "muscle_adult"
+		default:
+			baseImageName = "adult"
+		}
 	case 4: baseImageName = "elderly"
 	default: baseImageName = "egg"
 	}
@@ -284,7 +288,7 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 	case "cake": sickChance = 0.1
 	case "salad": sickChance = 0.2
 	case "onigiri": sickChance = 0.3
-	case "liver": sickChance = 0.9
+	case "liver": sickChance = 0.7
 	}
 
 	if rand.Float64() < sickChance {
@@ -318,10 +322,13 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 						maxFood = food
 					}
 				}
-				if maxFood == "ramen" {
-					egg.Status = "fat_adult" // 分岐進化名（ステータスとしても記録）
-				} else {
-					egg.Status = stageNames[egg.Stage] // 通常通り
+				switch maxFood {
+				case "ramen":
+					egg.Status = "fat_adult"
+				case "liver":
+					egg.Status = "muscle_adult"
+				default:
+					egg.Status = stageNames[egg.Stage] // 通常大人
 				}
 			} else {
 				egg.Status = stageNames[egg.Stage]
