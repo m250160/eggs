@@ -90,8 +90,8 @@ func main() {
 	http.HandleFunc("/Audio/", audioHandler)
 	http.HandleFunc("/minigame", minigameHandler)
 	http.HandleFunc("/heal", healHandler)
-	log.Println("起動 → http://localhost:8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	log.Println("起動 → http://localhost:18080")
+	if err := http.ListenAndServe(":18080", nil); err != nil {
 		log.Fatalf("サーバー起動失敗: %v", err)
 	}
 }
@@ -103,6 +103,12 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintln(w, `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>eggっち</title></head><body>`)
+
+	if egg.IsMinigame == false {
+		fmt.Fprintln(w, `<audio id="bgm" loop autoplay volume="0.5"><source src="/Audio/BGM/chiptune_sounds.mp3" type="audio/mpeg">お使いのブラウザはaudio要素をサポートしていません。</audio>`)
+	} else {
+		fmt.Fprintln(w, `<audio id="bgm" loop autoplay volume = "0.0"></audio>`)
+	}
 
 	if egg.IsSick > 0 && egg.Status != "dead" {
 		fmt.Fprintf(w, `<p style="color:red;">🤒 病気レベル %d：このまま成長すると死亡します！</p>`, egg.IsSick)
@@ -162,8 +168,8 @@ func minigameHandler(w http.ResponseWriter, r *http.Request) {
 	// ★ロジックを修正：ゲーム実行前に回数制限をチェック
 	if egg.MinigamePlays >= 3 {
 		fmt.Fprintln(w, `<!DOCTYPE html><html><head><title>ミニゲーム</title></head><body>`)
-		// // ミニゲーム用BGM（音量調整）
-		// fmt.Fprintln(w, `<audio id="minigame-bgm" loop autoplay volume="0.5"><source src="/Audio/BGM/dice_game.mp3" type="audio/mpeg">お使いのブラウザはaudio要素をサポートしていません。</audio>`)
+		// ミニゲーム用BGM（音量調整）
+		fmt.Fprintln(w, `<audio id="minigame-bgm" loop autoplay volume="0.5"><source src="/Audio/BGM/dice_game.mp3" type="audio/mpeg">お使いのブラウザはaudio要素をサポートしていません。</audio>`)
 		fmt.Fprintln(w, `<h2>お知らせ</h2><p>この形態ではもう遊べません！</p><button onclick="window.close()">閉じる</button></body></html>`)
 		return
 	}
