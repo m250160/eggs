@@ -127,6 +127,8 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, `<audio id="bgm" loop autoplay volume = "0.0"></audio>`)
 	}
 
+	egg.IsMinigame = false
+
 	if egg.IsSick > 0 && egg.Status != "dead" {
 		fmt.Fprintf(w, `<p style="color:red;">🤒 病気レベル %d：このまま成長すると死亡します！</p>`, egg.IsSick)
 		cost := egg.IsSick * 10
