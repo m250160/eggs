@@ -28,6 +28,7 @@ type Pet struct {
 	IsSick        int
 	Money         int
 	MinigamePlays int
+	IsMinigame    bool // ミニゲームをプレイ中かどうか
 	mu            sync.Mutex
 }
 
@@ -47,6 +48,7 @@ var egg = &Pet{
 	Generation:    1,
 	Money:         0,
 	MinigamePlays: 0,
+	IsMinigame: false,
 }
 
 // 各種設定値
@@ -86,9 +88,10 @@ func main() {
 	http.HandleFunc("/graveyard", graveyardHandler)
 	http.HandleFunc("/reset_graveyard", resetGraveyardHandler)
 	http.HandleFunc("/images/", imageHandler)
+	http.HandleFunc("/Audio/", audioHandler)
 	http.HandleFunc("/minigame", minigameHandler)
-	log.Println("起動 → http://localhost:8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	log.Println("起動 → http://localhost:18080")
+	if err := http.ListenAndServe(":18080", nil); err != nil {
 		log.Fatalf("サーバー起動失敗: %v", err)
 	}
 }
@@ -100,6 +103,15 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintln(w, `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>eggっち</title></head><body>`)
+	
+	// BGMを追加（音量を少し下げて自動再生）
+	if egg.IsMinigame == true {
+		fmt.Fprintln(w, `<audio id="bgm" loop autoplay volume="0.0"></audio>`)
+	} else {
+		fmt.Fprintln(w, `<audio id="bgm" loop autoplay volume="0.5"><source src="/Audio/BGM/chiptune_sounds.mp3" type="audio/mpeg">お使いのブラウザはaudio要素をサポートしていません。</audio>`)
+	}
+	
+	egg.IsMinigame = false
 
 	if egg.IsSick > 0 {
 		fmt.Fprintf(w, `<p style="color:red;">🤒 病気レベル %d：このまま成長すると死亡します！</p>`, egg.IsSick)
@@ -151,10 +163,15 @@ func minigameHandler(w http.ResponseWriter, r *http.Request) {
 	egg.mu.Lock()
 	defer egg.mu.Unlock()
 
+	egg.IsMinigame = true
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	// ★ロジックを修正：ゲーム実行前に回数制限をチェック
 	if egg.MinigamePlays >= 3 {
-		fmt.Fprintln(w, `<!DOCTYPE html><html><head><title>ミニゲーム</title></head><body><h2>お知らせ</h2><p>この形態ではもう遊べません！</p><button onclick="window.close()">閉じる</button></body></html>`)
+		fmt.Fprintln(w, `<!DOCTYPE html><html><head><title>ミニゲーム</title></head><body>`)
+		// // ミニゲーム用BGM（音量調整）
+		// fmt.Fprintln(w, `<audio id="minigame-bgm" loop autoplay volume="0.5"><source src="/Audio/BGM/dice_game.mp3" type="audio/mpeg">お使いのブラウザはaudio要素をサポートしていません。</audio>`)
+		fmt.Fprintln(w, `<h2>お知らせ</h2><p>この形態ではもう遊べません！</p><button onclick="window.close()">閉じる</button></body></html>`)
 		return
 	}
 
@@ -165,6 +182,10 @@ func minigameHandler(w http.ResponseWriter, r *http.Request) {
 
 	// ★ポップアップ用のHTMLとJavaScriptを返す
 	fmt.Fprintln(w, `<!DOCTYPE html><html><head><title>ミニゲーム結果</title></head><body>`)
+	// fmt.Fprintln(w, `<audio id="bgm" loop controls autoplay muted> </audio>`)
+	// ミニゲーム用BGM（音量調整）
+
+	fmt.Fprintln(w, `<audio id="minigame-bgm" loop autoplay volume="0.5"><source src="/Audio/BGM/dice_game.mp3" type="audio/mpeg">お使いのブラウザはaudio要素をサポートしていません。</audio>`)
 	fmt.Fprintf(w, "<h2>🎲 結果は... %d と %d！</h2>", dice1, dice2)
 	if dice1 == dice2 {
 		fmt.Fprintf(w, `<p style="color:red; font-weight:bold;">ゾロ目ボーナス！</p>`)
@@ -312,5 +333,10 @@ func loadJSON(target interface{}) error {
 
 // imageHandler：画像ファイルを配信
 func imageHandler(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "."+r.URL.Path)
+}
+
+// audioHandler：音声ファイルを配信
+func audioHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "."+r.URL.Path)
 }
