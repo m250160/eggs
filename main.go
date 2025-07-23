@@ -87,6 +87,7 @@ func main() {
 	http.HandleFunc("/reset_graveyard", resetGraveyardHandler)
 	http.HandleFunc("/images/", imageHandler)
 	http.HandleFunc("/minigame", minigameHandler)
+	http.HandleFunc("/heal", healHandler)
 	log.Println("起動 → http://localhost:8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("サーバー起動失敗: %v", err)
@@ -101,8 +102,10 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintln(w, `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>eggっち</title></head><body>`)
 
-	if egg.IsSick > 0 {
+	if egg.IsSick > 0 && egg.Status != "dead" {
 		fmt.Fprintf(w, `<p style="color:red;">🤒 病気レベル %d：このまま成長すると死亡します！</p>`, egg.IsSick)
+		cost := egg.IsSick * 10
+		fmt.Fprintf(w, `<form action="/heal" method="POST"><input type="submit" value="治療する（%dぐっち）"></form>`, cost)
 	}
 	fmt.Fprintf(w, `<p>所持金: %d ぐっち</p>`, egg.Money)
 
@@ -292,6 +295,33 @@ func graveyardHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprintln(w, `</ul><form action="/reset_graveyard" method="POST" onsubmit="return confirm('本当に墓地データを消去しますか？');"><input type="submit" value="墓地をリセット"></form><a href="/">戻る</a></body></html>`)
 }
+
+func healHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	egg.mu.Lock()
+	defer egg.mu.Unlock()
+
+	if egg.IsSick == 0 {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	cost := egg.IsSick * 10
+	if egg.Money < cost {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, `<script>alert("所持金が足りません！"); window.location.href = "/";</script>`)
+		return
+	}
+
+	egg.Money -= cost
+	egg.IsSick = 0
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
 
 // resetGraveyardHandler：墓地データをリセット
 func resetGraveyardHandler(w http.ResponseWriter, r *http.Request) {
