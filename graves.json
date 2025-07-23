@@ -1,7 +1,12 @@
 [
   {
-    "name": "ｗ３",
-    "stage": 1,
+    "name": "えぐち",
+    "stage": 0,
     "generation": 1
+  },
+  {
+    "name": "",
+    "stage": 0,
+    "generation": 2
   }
 ]

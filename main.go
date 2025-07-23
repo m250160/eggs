@@ -87,10 +87,27 @@ func main() {
 	http.HandleFunc("/images/", imageHandler)
 	http.HandleFunc("/minigame", minigameHandler)
 	http.HandleFunc("/heal", healHandler)
-	log.Println("起動 → http://localhost:8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	http.HandleFunc("/self_destruct", selfDestructHandler)
+	log.Println("起動 → http://localhost:8090")
+	if err := http.ListenAndServe(":8090", nil); err != nil {
 		log.Fatalf("サーバー起動失敗: %v", err)
 	}
+}
+
+func selfDestructHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	egg.mu.Lock()
+	defer egg.mu.Unlock()
+
+	if egg.Status != "dead" {
+		egg.Status = "dead"
+		saveToGraveyard(egg.Name, egg.Stage, egg.Generation)
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // statusHandler：メイン画面を表示
@@ -111,6 +128,10 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 	if egg.Status == "dead" {
 		fmt.Fprintf(w, `<h2>%s は天に召されました🙏</h2><img src="/images/dead.png" alt="死んだeggっち" style="width:200px;height:200px;"><p>世代: 第%d世代</p><p>最終ステージ: %s</p><form action="/next" method="POST"><input type="submit" value="次の卵を生む"></form><a href="/graveyard">過去のeggっちたち</a>`, egg.Name, egg.Generation, stageNames[egg.Stage])
 		return
+	}
+
+	if egg.Status != "dead" {
+		fmt.Fprintln(w, `<form method="POST" action="/self_destruct"><input type="submit" value="💣 自爆する"></form>`)
 	}
 
 	if egg.Name == "" {
@@ -234,14 +255,18 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	growth, ok := foodGrowth[food]
 	if !ok { growth = 1 }
+	// 食べる
 	egg.FeedCount += growth
 
+	// 病気になったらこの食事での成長はスキップ（次回以降の処理に回す）
+	if egg.IsSick > 0 {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	// 成長処理（病気でないことが前提）
 	for egg.FeedCount >= 5 {
-		if egg.IsSick > 0 {
-			egg.Status = "dead"
-			saveToGraveyard(egg.Name, egg.Stage, egg.Generation)
-			break
-		} else if egg.Stage < len(stageNames)-1 {
+		if egg.Stage < len(stageNames)-1 {
 			egg.Stage++
 			egg.Status = stageNames[egg.Stage]
 			egg.FeedCount = 0
@@ -252,6 +277,7 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
