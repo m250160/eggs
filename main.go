@@ -411,7 +411,24 @@ func healHandler(w http.ResponseWriter, r *http.Request) {
 	switch egg.Stage {
 	case 1: baseImageName = "baby"
 	case 2: baseImageName = "child"
-	case 3: baseImageName = "adult"
+	case 3: // adult
+		maxFood := ""
+		maxCount := 0
+		for food, count := range egg.FoodHistory {
+			if count > maxCount {
+				maxCount = count
+				maxFood = food
+			}
+		}
+
+		switch maxFood {
+		case "ramen":
+			baseImageName = "fat_adult"
+		case "liver":
+			baseImageName = "muscle_adult"
+		default:
+			baseImageName = "adult"
+		}
 	case 4: baseImageName = "elderly"
 	default: baseImageName = "egg"
 	}
