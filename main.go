@@ -91,8 +91,8 @@ func main() {
 	http.HandleFunc("/minigame", minigameHandler)
 	http.HandleFunc("/heal", healHandler)
 	http.HandleFunc("/self_destruct", selfDestructHandler)
-	log.Println("起動 → http://localhost:18090")
-	if err := http.ListenAndServe(":18090", nil); err != nil {
+	log.Println("起動 → http://localhost:8090")
+	if err := http.ListenAndServe(":8090", nil); err != nil {
 		log.Fatalf("サーバー起動失敗: %v", err)
 	}
 }
