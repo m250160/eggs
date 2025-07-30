@@ -299,14 +299,13 @@ func feedHandler(w http.ResponseWriter, r *http.Request) {
 	// 食べる
 	egg.FeedCount += growth
 
-	// 病気になったらこの食事での成長はスキップ（次回以降の処理に回す）
-	if egg.IsSick > 0 {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
 	// 成長処理（病気でないことが前提）
 	for egg.FeedCount >= 5 {
+		if egg.IsSick > 0 {
+			egg.Status = "dead"
+			saveToGraveyard(egg.Name, egg.Stage, egg.Generation)
+			break
+		}
 		if egg.Stage < len(stageNames)-1 {
 			egg.Stage++
 			egg.FeedCount = 0
